@@ -4,5 +4,8 @@ fedsam_hessian with scaffold
 fedgloss
 fedgloss with local sam_hessian
 
+correct fedlesam and its variants
 
-all other models are completed and currently being run
+all other models are completed and currently being run on:
+1 - CIFAR10/CIFAR100 (in-distribution test under heterogeneous scenarios (realized as synthetic label skew))
+2 - PACS and OfficeHome (domain generalization under covariate shifts [realized as feature skew leave-one domain out])
