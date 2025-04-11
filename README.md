@@ -70,7 +70,7 @@ TO DO: Add comprehensive table
 
 ## Variants of Second-Order Methods
 
-### SAM_Eigen_Trace
+### FedSAM_Eigen_Trace
 
 This joint approach combines both eigenvector-based perturbation and trace regularization:
 
@@ -78,7 +78,7 @@ This joint approach combines both eigenvector-based perturbation and trace regul
 2. Incorporates trace regularization in the loss function
 3. Uses both metrics to achieve locally flatter minima.
 
-### SAM_Hessian_Orth (Inhertied from ["Explicit Eigenvalue Regularization Improves Sharpness-Aware Minimization"](https://arxiv.org/abs/2501.12666))
+### FedSAM_Hessian_Orth (Inhertied from ["Explicit Eigenvalue Regularization Improves Sharpness-Aware Minimization"](https://arxiv.org/abs/2501.12666))
 
 This approach ensures orthogonality between the perturbation direction and the gradient:
 
@@ -89,7 +89,7 @@ This approach ensures orthogonality between the perturbation direction and the g
 ## Latency of Proposed Method and Consequent Optimizations
 The existing iterative methods lead to much longer training times (2x - 4x) than the base methods. We analyze sparser implementations of the our second-order method to achieve superior performances given a compute budget / upper bounds on local training.
 
-### FedHessian_Interleaved
+### FedSAMHessian_Interleaved
 
 This hybrid approach interleaves first-order and second-order updates:
 
@@ -97,7 +97,7 @@ This hybrid approach interleaves first-order and second-order updates:
 2. Periodically (every N steps) computes and applies second-order perturbations
 3. Balances computational efficiency with the benefits of second-order information
 
-### FedHessian_Switch
+### FedSAMHessian_Switch
 
 This approach switches from first-order to second-order methods during training:
 
@@ -148,7 +148,7 @@ Further Envisioned (Future Work):
 
 ### (Not Yet Implemented - To Be Done by this Week)
 
-### FedHessian_Interleaved
+### FedSAMHessian_Interleaved
 
 This approach will interleave first-order and second-order updates to balance computational efficiency with the benefits of second-order information. It will:
 
@@ -156,7 +156,7 @@ This approach will interleave first-order and second-order updates to balance co
 2. Periodically compute and apply second-order perturbations
 3. Adapt the frequency of second-order updates based on training progress
 
-### FedHessian_Switch
+### FedSAMHessian_Switch
 
 This approach will switch from first-order to second-order methods during training to leverage the benefits of both approaches at different stages. It will:
 

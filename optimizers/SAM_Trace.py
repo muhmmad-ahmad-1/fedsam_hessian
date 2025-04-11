@@ -66,7 +66,7 @@ class SAM_Trace(torch.optim.Optimizer):
 
         predictions = model(inputs)
         hessian_comp = Trace_Calculator(model,loss_func, data=(inputs, labels), cuda=True)
-        loss = loss_func(predictions, labels) + torch.mean(hessian_comp.trace(maxIter=self.maxIter)) * self.lambda_t
+        loss = loss_func(predictions, labels) + torch.mean(hessian_comp.compute_hessian_trace(n_samples=self.maxIter)) * self.lambda_t
         self.zero_grad()
         loss.backward()
         self.second_step()

@@ -26,7 +26,7 @@ class SAM_Hessian_Orth(torch.optim.Optimizer):
         self.maxIter = maxIter
 
     @torch.no_grad()
-    def first_step(self, hessian_comp):
+    def first_step(self, hessian_comp:hessian):
         grad_norm = 0.0
         grad_vec = []
 

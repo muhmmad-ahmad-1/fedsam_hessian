@@ -26,7 +26,7 @@ class SAM_Hessian(torch.optim.Optimizer):
         
 
     @torch.no_grad()
-    def first_step(self,hessian_comp):
+    def first_step(self,hessian_comp:hessian):
         #first order sum 
         grad_norm = 0
         for group in self.param_groups:

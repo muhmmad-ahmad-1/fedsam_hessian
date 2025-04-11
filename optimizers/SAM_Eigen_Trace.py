@@ -26,22 +26,31 @@ class SAM_Eigen_Trace(torch.optim.Optimizer):
         
 
     @torch.no_grad()
-    def first_step(self):
+    def first_step(self,hessian_comp):
         #first order sum 
-        grad_norm = self._grad_norm()
+        grad_norm = 0
+        for group in self.param_groups:
+            for idx,p in enumerate(group["params"]):
+                p.requires_grad = True 
+                if p.grad is None: 
+                    continue
+                    grad_norm+=p.grad.norm(p=2)
+        top_eigenvalues, top_eigenvector = hessian_comp.eigenvalues(maxIter=self.maxIter, tol=1e-2)
+        top_eigenvector = top_eigenvector[-1]
         for group in self.param_groups:
             scale = group["rho"] / (grad_norm + 1e-7)
-            for p in group["params"]:
+            for idx,p in enumerate(group["params"]):
                 p.requires_grad = True 
                 if p.grad is None: 
                     continue
                 # original SAM 
                 # e_w = p.grad * scale.to(p)
                 # ASAM 
-                e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
+                
+                e_w=p.grad * scale.to(p)
                 # climb to the local maximum "w + e(w)"
-                p.add_(e_w * 1)  
-                self.state[p]["e_w"] = e_w
+                p.add_(e_w * 1 + top_eigenvector[idx] * scale)  
+                self.state[p]["e_w"] = e_w + top_eigenvector[idx] * scale
     
     @torch.no_grad()
     def second_step(self):
@@ -57,16 +66,17 @@ class SAM_Eigen_Trace(torch.optim.Optimizer):
         inputs, labels, loss_func, model = self.paras
         labels = labels.reshape(-1).long()
         predictions = model(inputs)
+        hessian_comp = hessian(model,loss_func, data=(inputs, labels), cuda=True)
         # loss = loss_func(predictions, labels) + hessian_comp.trace(maxIter=2)[-1] * 0.1
         loss = loss_func(predictions,labels)
         self.zero_grad()
         loss.backward()
 
-        self.first_step()
+        self.first_step(hessian_comp)
 
         predictions = model(inputs)
         hessian_comp = Trace_Calculator(model,loss_func, data=(inputs, labels), cuda=True)
-        loss = loss_func(predictions, labels) + torch.mean(hessian_comp.trace(maxIter=self.maxIter)) * self.lambda_t
+        loss = loss_func(predictions, labels) + torch.mean(hessian_comp.compute_hessian_trace(n_samples=self.maxIter)) * self.lambda_t
         self.zero_grad()
         loss.backward()
         self.second_step()

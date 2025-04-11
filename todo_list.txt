@@ -1,0 +1,8 @@
+implement the following models:
+scaffold
+fedsam_hessian with scaffold
+fedgloss
+fedgloss with local sam_hessian
+
+
+all other models are completed and currently being run

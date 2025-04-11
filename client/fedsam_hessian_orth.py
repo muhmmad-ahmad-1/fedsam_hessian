@@ -1,17 +1,17 @@
 from .client import Client
 import copy
-from models.CNN import CNN
-from optimizers.SAM_Trace import SAM_Trace
+from models import *
+from optimizers.SAM_Hessian_Orth import SAM_Hessian_Orth
 from utils import *
 
-class fedsam_trace(Client):
+class fedsam_hessian_orth(Client):
     def __init__(self,dataset,trn_x,trn_y,batch_size,loss_func,learning_rate,weight_decay,optimizer,max_norm,grad_aggregator = False,args = {"mu":0.0},epochs=3):
-        super(fedsam_trace,self).__init__(dataset,trn_x,trn_y,batch_size,loss_func,learning_rate,weight_decay,optimizer,max_norm,grad_aggregator,args,epochs)
+        super(fedsam_hessian_orth,self).__init__(dataset,trn_x,trn_y,batch_size,loss_func,learning_rate,weight_decay,optimizer,max_norm,grad_aggregator,args,epochs)
     
     
     def init_optimizer(self, optimizer, learning_rate, weight_decay):
         self.base_optimizer = torch.optim.SGD(self.model.parameters(),learning_rate,weight_decay=weight_decay)
-        self.optimizer = SAM_Trace(self.model.parameters(),self.base_optimizer,rho=self.args.rho,adaptive=True,maxIter=self.args.maxIter,lambda_t=self.args.lambda_t)
+        self.optimizer = SAM_Hessian_Orth(self.model.parameters(),self.base_optimizer,rho=self.args.rho,adaptive=True,maxIter=self.args.maxIter)
     
     
     def train(self):
@@ -33,7 +33,7 @@ class fedsam_trace(Client):
                 
                 self.optimizer.step()
                 
-                torch.nn.utils.clip_grad_norm(parameters=self.model.parameters(),max_norm=self.max_norm)
+                torch.nn.utils.clip_grad_norm_(parameters=self.model.parameters(),max_norm=self.max_norm)
 
                 self.base_optimizer.step()   
                 

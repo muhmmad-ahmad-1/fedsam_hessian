@@ -11,7 +11,7 @@ class fedsam_hessian(Client):
     
     def init_optimizer(self, optimizer, learning_rate, weight_decay):
         self.base_optimizer = torch.optim.SGD(self.model.parameters(),learning_rate,weight_decay=weight_decay)
-        self.optimizer = SAM_Hessian(self.model.parameters(),self.base_optimizer,rho=self.args.rho,adaptive=True)
+        self.optimizer = SAM_Hessian(self.model.parameters(),self.base_optimizer,rho=self.args.rho,adaptive=True,maxIter=self.args.maxIter)
     
     
     def train(self):

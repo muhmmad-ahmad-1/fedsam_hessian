@@ -15,8 +15,8 @@ from datetime import datetime
 class Args:
     def __init__(self,dataset="CIFAR10",n_clients=10,training_rounds=50,learning_rate=5e-3,global_learning_rate=1,batch_size=64,weight_decay=1e-4,grad_aggregator=True,random_selection=False,
                  optimizer="sgd",loss_func="CELoss",rule="Drichlet",rule_arg=0.0,ub_sgm=0.0,aggr_scheme="FedAvg", local_epochs = 3,max_norm = 10,
-                 beta = 0, beta1 = 0, beta2 = 0, alpha = 0, rho = 0, mu = 0, lambd =0 , gamma = 0, epsilon = 0, lr_decay = 0,
-                 model_type = "CNN"
+                 beta = 0, beta1 = 0, beta2 = 0, alpha = 0, rho = 0, mu = 0, lambd =0 , gamma = 0, epsilon = 0, lr_decay = 0, lambda_t = 0.05, maxIter = 5,
+                 model_type = "CNN", sparse_optimizer = "SAM_Eigen_Trace", sparse_type = "Interleaved | Switch", sparse_k = 0.75
                  ):
         
         self.dataset = dataset
@@ -48,8 +48,12 @@ class Args:
         self.epsilon = epsilon
         self.lambd = lambd
         self.lr_decay = lr_decay
-        self.maxIter = 5
+        self.maxIter = maxIter
+        self.lambda_t = lambda_t
         self.model_type = model_type
+        self.sparse_optimizer = sparse_optimizer
+        self.sparse_type = sparse_type
+        self.sparse_k = sparse_k
 
 
 class Server:
