@@ -3,6 +3,11 @@ import torch.nn.functional as F
 from pyhessian import hessian # Hessian computation
 
 class SAM_Hessian(torch.optim.Optimizer):
+    '''
+    Base Optimizer for Second Order SAM Optimization:
+    Adds a second order term as perturbation (i.e. the maximum eigenvalue of the Hessian) to the existing
+    first order term (i.e. the gradient) in SAM.
+    '''
     def __init__(self, params, base_optimizer, rho, adaptive=False,maxIter = 5, **kwargs):
         assert rho >= 0.0, f"Invalid perturbation rate, should be non-negative: {rho}"
         self.max_norm = 10

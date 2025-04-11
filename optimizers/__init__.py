@@ -8,3 +8,5 @@ from .ESAM_D import ESAM_D
 from .ESAM_S import ESAM_S
 from .SAM_Hessian import SAM_Hessian
 from .SAM_Trace import SAM_Trace
+from .SAM_Eigen_Trace import SAM_Eigen_Trace
+from .SAM_Hessian_Orth import SAM_Hessian_Orth

@@ -2,32 +2,44 @@ from models import *
 from utils.utils_dataset import *
 from utils.utils_libs import *
 import torch
-from optimizers import SAM, ESAM, GAMASAM,LESAM
+from optimizers import SAM, ESAM, GAMASAM, LESAM
 import copy
 from torch.utils import data
 
 class Client:
     def __init__(self,dataset,trn_x,trn_y,batch_size,loss_func,learning_rate,weight_decay,optimizer,max_norm,grad_aggregator = False,args = {"mu":0.0},epochs=3):
-        if dataset == "CIFAR10":
-            self.model = CNN()
-            self.trn_x = trn_x
-            self.trn_y = trn_y
-            self.loss_func = loss_func
-            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-            self.max_norm = max_norm
-            self.args = args
-            self.deltas = None
-            self.dataset = Dataset(self.trn_x,self.trn_y,True,dataset)
-            self.dataloader = data.DataLoader(self.dataset,batch_size=batch_size,shuffle=True)
-            self.grad_aggregation = grad_aggregator
-            self.grad = {name: torch.zeros_like(param) for name, param in self.model.named_parameters() if param.requires_grad}
-            self.epochs = epochs
-            self.init_optimizer(optimizer,learning_rate,weight_decay)
-            
-            
+        # Initialize common attributes
+        self.trn_x = trn_x
+        self.trn_y = trn_y
+        self.loss_func = loss_func
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.max_norm = max_norm
+        self.args = args
+        self.deltas = None
+        self.dataset = Dataset(self.trn_x,self.trn_y,True,dataset)
+        self.dataloader = data.DataLoader(self.dataset,batch_size=batch_size,shuffle=True)
+        self.grad_aggregation = grad_aggregator
+        self.epochs = epochs
+        self.num_classes = 10 if dataset == "CIFAR10" else 100 if dataset == "CIFAR100" else 7 if dataset == "PACS" else 65 if dataset == "OfficeHome" else None
 
+        # Initialize model based on dataset and model type
+        if dataset in ["CIFAR10", "CIFAR100", "PACS", "OfficeHome"]:
+            if args.model_type == "CNN":
+                self.model = CNN(self.num_classes)
+            elif args.model_type == "ResNet":
+                self.model = ResNet(self.num_classes)
+            elif args.model_type == "ViT":
+                self.model = ViT_B_32(self.num_classes)
+            else:
+                raise ValueError(f"Unknown model type: {args.model_type}")
         else:
-            raise NotImplementedError("Invalid Dataset")
+            raise NotImplementedError(f"Unsupported dataset: {dataset}")
+
+        # Initialize gradients
+        self.grad = {name: torch.zeros_like(param) for name, param in self.model.named_parameters() if param.requires_grad}
+        
+        # Initialize optimizer
+        self.init_optimizer(optimizer,learning_rate,weight_decay)
 
     def init_optimizer(self,optimizer,learning_rate,weight_decay):
         if optimizer == "adam":
@@ -36,12 +48,14 @@ class Client:
             self.optimizer = torch.optim.SGD(self.model.parameters(),learning_rate,weight_decay=weight_decay)
     
     def train(self):
+        # Create a copy of the global model with the same architecture
         global_model_params = copy.deepcopy(self.model.state_dict())
-        global_model = CNN()
+        global_model = type(self.model)(self.num_classes) 
         global_model.load_state_dict(global_model_params)
         global_model.to(self.device)
             
-        self.model.train(); self.model = self.model.to(self.device)
+        self.model.train()
+        self.model = self.model.to(self.device)
         
         self.model.zero_grad()
 

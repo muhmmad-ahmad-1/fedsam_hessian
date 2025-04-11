@@ -18,7 +18,7 @@ class fedlesam_d(Client):
 
     def train(self,global_grad,deltas):
         global_model_params = copy.deepcopy(self.model.state_dict())
-        global_model = CNN()
+        global_model = type(self.model)(self.num_classes)
         global_model.load_state_dict(global_model_params)
         global_model.to(self.device)
             
@@ -39,7 +39,7 @@ class fedlesam_d(Client):
                 
                 self.optimizer.step(global_update)
                 
-                torch.nn.utils.clip_grad_norm(parameters=self.model.parameters(),max_norm=self.max_norm)
+                torch.nn.utils.clip_grad_norm_(parameters=self.model.parameters(),max_norm=self.max_norm)
 
                 self.base_optimizer.step()   
                 

@@ -47,13 +47,13 @@ class FedLESAM_D(Server):
                  
     def train(self):
         self.random_select = random.sample(range(self.n_clients),self.random_selection)
-        # with ThreadPoolExecutor() as executor:
-        #     futures = [executor.submit(client.train(self.global_grad,self.h[i]-get_mdl_params(client.model).clone().detach())) for i,client in enumerate(self.clients) if i in self.random_select]
-        #     for future in futures:
-        #         try:
-        #             future.result()
-        #         except Exception as e:
-        #             print(f"Client training failed: {e}")
-        for i,client in enumerate(self.clients):
-            if i in self.random_select:
-                client.train(self.global_grad,self.h[i]-get_mdl_params(client.model).clone().detach())
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(client.train(self.global_grad,self.h[i]-get_mdl_params(client.model).clone().detach())) for i,client in enumerate(self.clients) if i in self.random_select]
+            for future in futures:
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"Client training failed: {e}")
+        # for i,client in enumerate(self.clients):
+        #     if i in self.random_select:
+        #         client.train(self.global_grad,self.h[i]-get_mdl_params(client.model).clone().detach())

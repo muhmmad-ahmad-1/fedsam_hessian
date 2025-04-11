@@ -6,7 +6,7 @@ References:
 '''
 
 class DatasetObject:
-    def __init__(self,dataset,n_client,seed,rule,unbalanced_sgm =0,rule_arg='',data_path=''):
+    def __init__(self,dataset,n_client,seed,rule,unbalanced_sgm =0,rule_arg='',data_path='',held_out_domain=-1):
         '''
         Class for Dataset Preparation and Distribution among clients
         Args:
@@ -31,6 +31,7 @@ class DatasetObject:
         self.data_path = data_path
         self.unbalanced_sgm = unbalanced_sgm
         self.name = "%s_%d_%d_%s_%s" %(self.dataset, self.n_client, self.seed, self.rule, rule_arg_str)
+        self.held_out_domain = held_out_domain
         self.set_data()
         
     
@@ -89,6 +90,86 @@ class DatasetObject:
                 trn_y = trn_y.numpy().reshape(-1, 1)
                 tst_x = tst_x.numpy()
                 tst_y = tst_y.numpy().reshape(-1, 1)
+            
+            elif self.dataset == 'PACS':
+                # Define domains
+                self.domains = ['art_painting', 'cartoon', 'photo', 'sketch']
+                self.n_cls = 7  # PACS has 7 categories
+                self.channels = 3
+                self.width = 224
+                self.height = 224
+
+                # Hold one domain out (e.g., last one as default)
+                held_out_domain = self.domains[self.held_out_domain]  
+                # Common transforms (normalize to ImageNet if using pretrained models)
+                transform = transforms.Compose([
+                    transforms.Resize((224, 224)),
+                    transforms.ToTensor(),
+                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                ])
+
+                domain_paths = [os.path.join(self.data_path, d) for d in self.domains]
+                trn_x, trn_y = [], []
+                tst_x, tst_y = [], []
+
+                # Iterate over domains
+                for domain, path in zip(self.domains, domain_paths):
+                    dataset = ImageFolder(path, transform=transform)
+                    x = [np.array(img[0].numpy()) for img in dataset]
+                    y = [img[1] for img in dataset]
+                    x = np.stack(x)
+                    y = np.array(y).reshape(-1, 1)
+
+                    if domain == held_out_domain:
+                        tst_x.append(x)
+                        tst_y.append(y)
+                    else:
+                        trn_x.append(x)
+                        trn_y.append(y)
+
+                trn_x = np.concatenate(trn_x, axis=0)
+                trn_y = np.concatenate(trn_y, axis=0)
+                tst_x = np.concatenate(tst_x, axis=0)
+                tst_y = np.concatenate(tst_y, axis=0)
+            
+            elif self.dataset == 'OfficeHome':
+                self.domains = ['Art', 'Clipart', 'Product', 'Real_World']
+                self.n_cls = 65
+                self.channels = 3
+                self.width = 224
+                self.height = 224
+
+                held_out_domain = self.domains[self.held_out_domain]  
+
+                transform = transforms.Compose([
+                    transforms.Resize((224, 224)),
+                    transforms.ToTensor(),
+                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                ])
+
+                domain_paths = [os.path.join(self.data_path, d) for d in self.domains]
+                trn_x, trn_y = [], []
+                tst_x, tst_y = [], []
+
+                for domain, path in zip(self.domains, domain_paths):
+                    dataset = ImageFolder(path, transform=transform)
+                    x = [np.array(img[0].numpy()) for img in dataset]
+                    y = [img[1] for img in dataset]
+                    x = np.stack(x)
+                    y = np.array(y).reshape(-1, 1)
+
+                    if domain == held_out_domain:
+                        tst_x.append(x)
+                        tst_y.append(y)
+                    else:
+                        trn_x.append(x)
+                        trn_y.append(y)
+
+                trn_x = np.concatenate(trn_x, axis=0)
+                trn_y = np.concatenate(trn_y, axis=0)
+                tst_x = np.concatenate(tst_x, axis=0)
+                tst_y = np.concatenate(tst_y, axis=0)
+
 
 
             
@@ -255,7 +336,7 @@ class Dataset(torch.utils.data.Dataset):
     def __init__(self, data_x, data_y=True, train=False, dataset_name=''):
         self.name = dataset_name
             
-        if self.name == 'CIFAR10':
+        if self.name == 'CIFAR10' or self.name == 'CIFAR100':
             self.train = train
             self.transform = transforms.Compose([transforms.ToTensor()])
         
@@ -263,29 +344,31 @@ class Dataset(torch.utils.data.Dataset):
             self.y_data = data_y
             if not isinstance(data_y, bool):
                 self.y_data = data_y.astype('float32')
+        
+        elif self.name == 'PACS' or self.name == 'OfficeHome':
+            self.train = train
+            self.transform = transforms.Compose([
+                transforms.ToTensor(),  # If you want to redo transform
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ])
+            self.X_data = data_x
+            self.y_data = data_y.astype('int64') if not isinstance(data_y, bool) else data_y
                 
         else:
             raise NotImplementedError("Not a valid dataset")
+        
            
     def __len__(self):
         return len(self.X_data)
 
     def __getitem__(self, idx):
-        if self.name == 'CIFAR10' or self.name == 'CIFAR100':
+        if self.name in ['CIFAR10', 'CIFAR100', 'PACS','OfficeHome']:
             img = self.X_data[idx]
-            if self.train:
-                img = np.flip(img, axis=2).copy() if (np.random.rand() > .5) else img # Horizontal flip
-                if (np.random.rand() > .5):
-                # Random cropping 
-                    pad = 4
-                    extended_img = np.zeros((3,32 + pad *2, 32 + pad *2)).astype(np.float32)
-                    extended_img[:,pad:-pad,pad:-pad] = img
-                    dim_1, dim_2 = np.random.randint(pad * 2 + 1, size=2)
-                    img = extended_img[:,dim_1:dim_1+32,dim_2:dim_2+32]
             img = np.moveaxis(img, 0, -1)
             img = self.transform(img)
             if isinstance(self.y_data, bool):
                 return img
             else:
-                y = self.y_data[idx]
-                return img, y
+                return img, self.y_data[idx]
+        else:
+            raise NotImplementedError("Not a valid dataset")

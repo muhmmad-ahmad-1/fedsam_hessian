@@ -15,14 +15,14 @@ class ViT_B_32(nn.Module):
 
         # Replace all LayerNorm layers with GroupNorm
         self._replace_layernorm_with_groupnorm(num_groups)
-
+        
     def _replace_layernorm_with_groupnorm(self, num_groups):
         """Recursively replace all LayerNorm layers with GroupNorm"""
         for name, module in self.vit.named_modules():
             if isinstance(module, nn.LayerNorm):
                 parent_module, attr = self._get_parent_module(name)
                 setattr(parent_module, attr, nn.GroupNorm(num_groups, module.normalized_shape[0]))
-
+                
     def _get_parent_module(self, module_name):
         """Helper to get parent module and attribute name"""
         components = module_name.split(".")
@@ -30,6 +30,6 @@ class ViT_B_32(nn.Module):
         for comp in components[:-1]:
             parent = getattr(parent, comp)
         return parent, components[-1]
-
+    
     def forward(self, x):
         return self.vit(x) 

@@ -268,14 +268,121 @@ class hessian():
         return eigen_list_full, weight_list_full
 
 
-class Trace_Calculator:
-    def __init__(self, model, criterion, data=None, dataloader=None, cuda=True):
-        assert (data is not None and dataloader is None) or (data is None and dataloader is not None)
+# class Trace_Calculator:
+#     def __init__(self, model, criterion, data=None, dataloader=None, cuda=True):
+#         assert (data is not None and dataloader is None) or (data is None and dataloader is not None)
 
-        self.model = model.eval()  # Ensure model is in evaluation mode
+#         self.model = model.eval()  # Ensure model is in evaluation mode
+#         self.criterion = criterion
+#         self.device = 'cuda' if cuda else 'cpu'
+
+#         if data is not None:
+#             self.data = data
+#             self.full_dataset = False
+#         else:
+#             self.data = dataloader
+#             self.full_dataset = True
+
+#         if not self.full_dataset:
+#             self.inputs, self.targets = self.data
+#             self.inputs, self.targets = self.inputs.to(self.device), self.targets.to(self.device)
+
+#             # Compute gradients for single-batch case
+#             outputs = self.model(self.inputs)
+#             loss = self.criterion(outputs, self.targets)
+#             loss.backward(create_graph=True)
+
+#         # Extract parameters and gradients
+#         self.params, self.gradsH = self.get_params_grad(self.model)
+
+#     def trace(self, maxIter=100, tol=1e-3):
+#         """
+#         Compute the trace of the Hessian using Hutchinson's method.
+#         maxIter: Maximum iterations
+#         tol: Convergence tolerance
+#         """
+
+#         trace_vhv = []
+#         trace = torch.tensor(0.0, device=self.device, requires_grad=True)
+
+#         for i in range(maxIter):
+#             self.model.zero_grad()
+
+#             # Generate Rademacher random vectors with requires_grad=True
+#             v = [torch.randint_like(p, high=2, device=self.device, dtype=p.dtype, requires_grad=True) for p in self.params]
+#             v = [torch.where(v_i == 0, torch.tensor(-1, device=self.device, dtype=v_i.dtype), v_i).detach().requires_grad_() for v_i in v]
+
+#             if self.full_dataset:
+#                 _,Hv = self.dataloader_hv_product(v)
+#             else:
+#                 Hv = self.hessian_vector_product(self.gradsH, self.params, v)
+#             trace_estimate = self.group_product(Hv, v)
+#             trace_vhv.append(trace_estimate)
+
+#             # Compute moving mean of trace estimates
+#             trace = torch.mean(torch.stack(trace_vhv))
+
+#             # Convergence check
+#             if len(trace_vhv) > 1 and abs(trace - torch.mean(torch.stack(trace_vhv[:-1]))) / (abs(trace) + 1e-6) < tol:
+#                 break
+
+#         return torch.stack(trace_vhv)  # Ensure output retains gradients
+
+#     # Function Updates
+#     def group_product(self,xs, ys):
+#         """ Compute the inner product of two lists of tensors """
+#         return sum([torch.sum(x * y) for (x, y) in zip(xs, ys)])
+
+#     def get_params_grad(self,model):
+#         """ Get model parameters and their gradients """
+#         params = []
+#         grads = []
+#         for param in model.parameters():
+#             if not param.requires_grad:
+#                 continue
+#             params.append(param)
+#             grads.append(param.grad if param.grad is not None else torch.zeros_like(param))
+#         return params, grads
+
+#     # Ensure Hessian-Vector Product (Hv) is differentiable
+#     def hessian_vector_product(self,gradsH, params, v):
+#         """ Compute Hessian-vector product (Hv) """
+#         hv = torch.autograd.grad(gradsH, params, grad_outputs=v, only_inputs=True, retain_graph=True)
+#         return hv
+    
+#     def dataloader_hv_product(self,V):
+#         """
+#         Compute the Hessian-vector product using the entire dataset
+#         """
+#         device = self.device
+#         num_data = 0
+#         THv = [torch.zeros(p.size()).to(device) for p in self.params]
+#         for inputs, targets in self.data:
+#             self.model.zero_grad()
+#             tmp_num_data = inputs.size(0)
+#             outputs = self.model(inputs.to(device))
+#             loss = self.criterion(outputs, targets.to(device))
+#             loss.backward(create_graph=True)
+#             params, gradsH = self.get_params_grad(self.model)
+#             self.model.zero_grad()
+#             Hv = self.hessian_vector_product(gradsH, params, V)
+#             THv = [THv1 + Hv1 * float(tmp_num_data) + 0. for THv1, Hv1 in zip(THv, Hv)]
+#             num_data += float(tmp_num_data)
+#         THv = [THv1 / float(num_data) for THv1 in THv]
+#         eigenvalue = self.group_product(THv, V)
+#         return eigenvalue, THv
+
+class Trace_Calculator:
+    '''
+    Uses Hutchinson's method to compute the trace of the Hessian (an unbiased stochastic estimator)
+    We run for a few samples and take the average to estimate the trace.
+    '''
+    def __init__(self, model, criterion, data=None, dataloader=None, cuda=True):
+        self.model = model.eval()
         self.criterion = criterion
         self.device = 'cuda' if cuda else 'cpu'
-
+        self.data = data
+        self.dataloader = dataloader
         if data is not None:
             self.data = data
             self.full_dataset = False
@@ -291,83 +398,132 @@ class Trace_Calculator:
             outputs = self.model(self.inputs)
             loss = self.criterion(outputs, self.targets)
             loss.backward(create_graph=True)
+        
+        else:
+            n_batches = 0
+            for inputs, targets in self.dataloader:
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, targets)
+                loss.backward(create_graph=True)
+                n_batches += 1
+            
+            # Normalize gradients by number of batches
+            for param in self.model.parameters():
+                if param.requires_grad and param.grad is not None:
+                    param.grad /= n_batches
 
         # Extract parameters and gradients
         self.params, self.gradsH = self.get_params_grad(self.model)
 
-    def trace(self, maxIter=100, tol=1e-3):
-        """
-        Compute the trace of the Hessian using Hutchinson's method.
-        maxIter: Maximum iterations
-        tol: Convergence tolerance
-        """
-
-        trace_vhv = []
-        trace = torch.tensor(0.0, device=self.device, requires_grad=True)
-
-        for i in range(maxIter):
-            self.model.zero_grad()
-
-            # Generate Rademacher random vectors with requires_grad=True
-            v = [torch.randint_like(p, high=2, device=self.device, dtype=p.dtype, requires_grad=True) for p in self.params]
-            v = [torch.where(v_i == 0, torch.tensor(-1, device=self.device, dtype=v_i.dtype), v_i).detach().requires_grad_() for v_i in v]
-
-            if self.full_dataset:
-                _,Hv = self.dataloader_hv_product(v)
-            else:
-                Hv = self.hessian_vector_product(self.gradsH, self.params, v)
-            trace_estimate = self.group_product(Hv, v)
-            trace_vhv.append(trace_estimate)
-
-            # Compute moving mean of trace estimates
-            trace = torch.mean(torch.stack(trace_vhv))
-
-            # Convergence check
-            if len(trace_vhv) > 1 and abs(trace - torch.mean(torch.stack(trace_vhv[:-1]))) / (abs(trace) + 1e-6) < tol:
-                break
-
-        return torch.stack(trace_vhv)  # Ensure output retains gradients
-
-    # Function Updates
-    def group_product(self,xs, ys):
-        """ Compute the inner product of two lists of tensors """
-        return sum([torch.sum(x * y) for (x, y) in zip(xs, ys)])
-
-    def get_params_grad(self,model):
+    def get_params_grad(self):
         """ Get model parameters and their gradients """
         params = []
         grads = []
-        for param in model.parameters():
+        for param in self.model.parameters():
             if not param.requires_grad:
                 continue
             params.append(param)
             grads.append(param.grad if param.grad is not None else torch.zeros_like(param))
         return params, grads
 
-    # Ensure Hessian-Vector Product (Hv) is differentiable
-    def hessian_vector_product(self,gradsH, params, v):
-        """ Compute Hessian-vector product (Hv) """
-        hv = torch.autograd.grad(gradsH, params, grad_outputs=v, only_inputs=True, retain_graph=True)
-        return hv
+    def compute_hessian_trace(self, n_samples = 100, tol = 1e-3):
+        trace = torch.tensor(0.0, device=self.params.device)
+        for i in range(n_samples):
+            # Generate random Rademacher vectors
+            zs = [torch.randint(0, 2, p.size(), device=p.device) * 2.0 - 1.0 for p in self.params]
+            # Compute Hessian-vector product H z
+            h_zs = torch.autograd.grad(self.gradsH, self.params, grad_outputs=zs, create_graph=True)
+            # Compute z^T H z
+            sample_trace = sum((h_z * z).sum() for h_z, z in zip(h_zs, zs))
+            old_trace = trace
+            trace = trace * i / (i + 1) + sample_trace / (i + 1)
+            if i > 1 and abs(trace - old_trace) / (abs(trace) + 1e-6) < tol:
+                break
+        return trace
     
-    def dataloader_hv_product(self,V):
-        """
-        Compute the Hessian-vector product using the entire dataset
-        """
-        device = self.device
-        num_data = 0
-        THv = [torch.zeros(p.size()).to(device) for p in self.params]
-        for inputs, targets in self.data:
-            self.model.zero_grad()
-            tmp_num_data = inputs.size(0)
-            outputs = self.model(inputs.to(device))
-            loss = self.criterion(outputs, targets.to(device))
+    import torch
+
+class Trace_Dropout_Calculator:
+    '''
+    Uses an implementation of Dropout based variation of Hutchinson's method to accelerate computation.
+    Taken from: "Regularizing Deep Neural Networks with Stochastic Estimators of Hessian Trace"
+    (https://arxiv.org/abs/2208.05924)
+    Original paper did not dive into runtime gains or performance conservation when shifting from original Hutchinson's
+    to this dropout based version to reduce computations.
+    NOTE: Run a few test runs to ensure it does bring about an imrpovement in trace regularization approach speed without 
+    affecting performance gains before including in the optimizers suite.
+    '''
+    def __init__(self, model, criterion, p=0.05, data=None, dataloader=None, device = 'cuda'):
+        self.model = model.eval()
+        self.criterion = criterion
+        self.device = device
+        self.data = data
+        self.dataloader = dataloader
+        self.p = p
+
+        if data is not None:
+            self.inputs, self.targets = data
+            self.inputs, self.targets = self.inputs.to(self.device), self.targets.to(self.device)
+            self.full_dataset = False
+
+            outputs = self.model(self.inputs)
+            loss = self.criterion(outputs, self.targets)
             loss.backward(create_graph=True)
-            params, gradsH = self.get_params_grad(self.model)
-            self.model.zero_grad()
-            Hv = self.hessian_vector_product(gradsH, params, V)
-            THv = [THv1 + Hv1 * float(tmp_num_data) + 0. for THv1, Hv1 in zip(THv, Hv)]
-            num_data += float(tmp_num_data)
-        THv = [THv1 / float(num_data) for THv1 in THv]
-        eigenvalue = self.group_product(THv, V)
-        return eigenvalue, THv
+        else:
+            self.full_dataset = True
+            n_batches = 0
+            for inputs, targets in self.dataloader:
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, targets)
+                loss.backward(create_graph=True)
+                n_batches += 1
+
+            for param in self.model.parameters():
+                if param.requires_grad and param.grad is not None:
+                    param.grad /= n_batches
+
+        self.params, self.gradsH = self.get_params_grad()
+
+    def get_params_grad(self):
+        """Get model parameters and their gradients"""
+        params = []
+        grads = []
+        for param in self.model.parameters():
+            if param.requires_grad:
+                params.append(param)
+                grads.append(param.grad if param.grad is not None else torch.zeros_like(param))
+        return params, grads
+
+    def sample_q_vector(self, shape, device):
+        """Generate Q(p)-distributed vector: ±1 with prob p, 0 with prob 1-2p"""
+        probs = torch.rand(shape, device=device)
+        mask = probs < 2 * self.p
+        signs = torch.randint_like(probs, low=0, high=2) * 2 - 1  # ±1
+        return torch.where(mask, signs, torch.zeros_like(signs))
+
+    def compute_trace_dropout(self, maxIter=100, tol=1e-3):
+        trace = torch.tensor(0.0, device=self.device)
+        for i in range(maxIter):
+            # Q(p)-based noise vector for each parameter
+            sigmas = [self.sample_q_vector(p.size(), p.device) for p in self.params]
+
+            # v = g · σ (element-wise)
+            v = [g * s for g, s in zip(self.gradsH, sigmas)]
+
+            # h = dv/dω
+            h = torch.autograd.grad(v, self.params, grad_outputs=[torch.ones_like(vv) for vv in v], retain_graph=True, create_graph=True)
+
+            # t = σ^T h
+            t = sum((s * hh).sum() for s, hh in zip(sigmas, h))
+            old_trace = trace
+            trace = trace * i / (i + 1) + t / (i + 1)
+
+            if i > 1 and abs(trace - old_trace) / (abs(trace) + 1e-6) < tol:
+                break
+
+        return trace
+
+    
+

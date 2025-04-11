@@ -8,7 +8,7 @@ class fedprox(Client):
     
     def train(self):
         global_model_params = copy.deepcopy(self.model.state_dict())
-        global_model = CNN()
+        global_model = type(self.model)(self.num_classes)
         global_model.load_state_dict(global_model_params)
         global_model.to(self.device)
             

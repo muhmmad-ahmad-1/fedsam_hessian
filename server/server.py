@@ -3,19 +3,20 @@ from utils.utils_libs import *
 from utils.utils_eval import *
 from utils.utils_metric import *
 from utils.utils import *
-from models import *
+from models import CNN, ResNet, ViT_B_32
 from client.client import *
 import pandas as pd
 import tqdm 
 import json
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 
 class Args:
     def __init__(self,dataset="CIFAR10",n_clients=10,training_rounds=50,learning_rate=5e-3,global_learning_rate=1,batch_size=64,weight_decay=1e-4,grad_aggregator=True,random_selection=False,
                  optimizer="sgd",loss_func="CELoss",rule="Drichlet",rule_arg=0.0,ub_sgm=0.0,aggr_scheme="FedAvg", local_epochs = 3,max_norm = 10,
                  beta = 0, beta1 = 0, beta2 = 0, alpha = 0, rho = 0, mu = 0, lambd =0 , gamma = 0, epsilon = 0, lr_decay = 0,
-                 model = CNN()
+                 model_type = "CNN"
                  ):
         
         self.dataset = dataset
@@ -48,6 +49,7 @@ class Args:
         self.lambd = lambd
         self.lr_decay = lr_decay
         self.maxIter = 5
+        self.model_type = model_type
 
 
 class Server:
@@ -55,9 +57,54 @@ class Server:
         
         self.dataset = args.dataset
         
-        if self.dataset == "CIFAR10":
-            self.n_cls = 10
-            self.global_model = CNN()
+        # Initialize model based on dataset and model type
+        if args.model_type == "CNN":
+            if self.dataset == "CIFAR10":
+                self.n_cls = 10
+                self.global_model = CNN(n_cls=10)
+            elif self.dataset == "CIFAR100":
+                self.n_cls = 100
+                self.global_model = CNN(n_cls=100)
+            elif self.dataset == "PACS":
+                self.n_cls = 7
+                self.global_model = CNN(n_cls=7)
+            elif self.dataset == "OfficeHome":
+                self.n_cls = 65
+                self.global_model = CNN(n_cls=65)
+            else:
+                raise ValueError(f"Unsupported dataset: {self.dataset}")
+        elif args.model_type == "ResNet":
+            if self.dataset == "CIFAR10":
+                self.n_cls = 10
+                self.global_model = ResNet(n_cls=10)
+            elif self.dataset == "CIFAR100":
+                self.n_cls = 100
+                self.global_model = ResNet(n_cls=100)
+            elif self.dataset == "PACS":
+                self.n_cls = 7
+                self.global_model = ResNet(n_cls=7)
+            elif self.dataset == "OfficeHome":
+                self.n_cls = 65
+                self.global_model = ResNet(n_cls=65)
+            else:
+                raise ValueError(f"Unsupported dataset: {self.dataset}")
+        elif args.model_type == "ViT":
+            if self.dataset == "CIFAR10":
+                self.n_cls = 10
+                self.global_model = ViT_B_32(num_classes=10)
+            elif self.dataset == "CIFAR100":
+                self.n_cls = 100
+                self.global_model = ViT_B_32(num_classes=100)
+            elif self.dataset == "PACS":
+                self.n_cls = 7
+                self.global_model = ViT_B_32(num_classes=7)
+            elif self.dataset == "OfficeHome":
+                self.n_cls = 65
+                self.global_model = ViT_B_32(num_classes=65)
+            else:
+                raise ValueError(f"Unsupported dataset: {self.dataset}")
+        else:
+            raise ValueError(f"Unknown model type: {args.model_type}")
             
         self.n_clients = args.n_clients
         self.tr_rounds = args.tr_rounds
@@ -114,10 +161,13 @@ class Server:
 
         self.train_and_eval()
         
-        self.results = pd.DataFrame.from_dict(self.metrics)
-        self.results = self.results.transpose()
+        self.results = json.dumps(self.metrics)
+        self.results['args'] = self.args
+        time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         
-        self.results.to_csv("Results/"+self.data.name+"_"+self.aggregation+"_"+"_"+self.aggregator+"_"+self.opt_name+".csv")
+        save_path = "Results/"+self.data.name+"_"+self.aggregation+"_"+"_"+self.aggregator+"_"+self.opt_name+"_"+time+".json"
+        with open(save_path, "w") as f:
+            f.write(self.results)
         
     def split_data(self):
         self.data = DatasetObject(self.dataset,self.n_clients,self.seed,self.rule,self.ub_sgm,self.alpha)
@@ -131,7 +181,7 @@ class Server:
         
         self.data_cardinality = np.array([self.trn_y[i].shape[0] for i in range(self.n_clients)])
         self.data_ratio = self.data_cardinality / np.sum(self.data_cardinality)
-        self.test = Test(self.dataset,self.test_x,self.test_y,self.global_model,self.device)
+        self.test = Test(self.dataset,self.test_x,self.test_y,self.global_model,self.device,self.tr_rounds)
     
     def initialize_clients(self):
          self.clients = [Client(self.dataset,self.trn_x[i],self.trn_y[i],self.batch_size,self.loss_func,self.lr,self.weight_decay,self.opt_name,10,self.grad_aggregator,self.args,self.local_epochs) for i in range(self.n_clients)]
@@ -205,9 +255,9 @@ class Server:
     def train(self):
         # for client in self.clients:
         #     client.train()
-        random_select = random.sample(range(self.n_clients),self.random_selection)
+        self.random_select = random.sample(range(self.n_clients),self.random_selection)
         with ThreadPoolExecutor() as executor:
-            futures = [executor.submit(client.train) for i,client in enumerate(self.clients) if i in random_select]
+            futures = [executor.submit(client.train) for i,client in enumerate(self.clients) if i in self.random_select]
 
             for future in futures:
                 try:
@@ -216,16 +266,18 @@ class Server:
                     print(f"Client training failed: {e}")
         
     def test_metrics(self,round):
-        acc,f1, trace, top_eigenvalue =  self.test.test()
+        acc,f1, trace, top_eigenvalue =  self.test.test(round)
         
         self.metrics[round]["Accuracy"] = acc
         self.metrics[round]["F1 Score"] = f1
-        self.metrics[round]["Trace"] = trace
-        self.metrics[round]["Top Eigenvalue"] = top_eigenvalue
+        if trace is not None:
+            self.metrics[round]["Trace"] = trace
+        if top_eigenvalue is not None:
+            self.metrics[round]["Top Eigenvalue"] = top_eigenvalue
     
     def gradient_eval(self,round):
-        client_grads = [client.grad for client in self.clients]
-        self.grad_metrics = Gradient_Metrics(self.n_clients,client_grads,self.global_grad)
+        client_grads = [client.grad for client in self.clients if client.id in self.random_select]
+        self.grad_metrics = Gradient_Metrics(self.random_selection,client_grads,self.global_grad)
         
         self.metrics[round] = self.grad_metrics.metrics
     

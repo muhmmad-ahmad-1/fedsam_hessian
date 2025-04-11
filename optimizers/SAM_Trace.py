@@ -3,6 +3,11 @@ import torch.nn.functional as F
 from pyhessian import hessian, Trace_Calculator # Trace computation
 
 class SAM_Trace(torch.optim.Optimizer):
+    '''
+    Base Optimizer for Second Order SAM Optimization:
+    Adds a regularization term (i.e. the trace of the Hessian) to the existing
+    loss function (CELoss) for sharpness aware training based on curvature regularization.
+    '''
     def __init__(self, params, base_optimizer, rho, adaptive=False,maxIter = 5,lambda_t = 0.05, **kwargs):
         assert rho >= 0.0, f"Invalid perturbation rate, should be non-negative: {rho}"
         self.max_norm = 10

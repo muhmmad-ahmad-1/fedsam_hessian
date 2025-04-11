@@ -73,33 +73,7 @@ class Gradient_Metrics:
         self.metrics["Variance Grad"] = self.average_variance()
         self.metrics["Difference of Norm (Grad)"] = self.avg_diff_norms()
         
-        
-class Hessian_Metrics:
-    def __init__(self,n_clients,client_hessians):
-        self.n = n_clients
-        self.cln_hessian = client_hessians
-        self.metrics = {}
-        
-        self.calculate_metrics()
-    
-    def calculate_metrics(self):
-        
-        for name in self.cln_hessian.keys():
-            dets = torch.tensor([torch.linalg.det(hessian[name]) for hessian in self.cln_hessian]).flatten()
-            fb_norm = torch.tensor([torch.linalg.matrix_norm(hessian[name]) for hessian in self.cln_hessian]).flatten()
-            nuclear_norm = torch.tensor([torch.norm(hessian[name],'nuc') for hessian in self.cln_hessian]).flatten()
-            trace = torch.tensor([torch.trace(hessian[name]) for hessian in self.cln_hessian]).flatten()
-            cond = torch.tensor([torch.linalg.cond(hessian[name]) for hessian in self.cln_hessian]).flatten()
-            singulars = [torch.linalg.svdvals(hessian[name]) for hessian in self.cln_hessian]
 
-            self.metrics[name] = {}
-            self.metrics[name]["Det."] = dets
-            self.metrics[name]["Fb. Norm"] = fb_norm
-            self.metrics[name]["Nuc. Norm"] = nuclear_norm
-            self.metrics[name]["Trace"] = trace
-            self.metrics[name]["Condition Number"] = cond
-            self.metrics[name]["Singulars"] = singulars
-             
 class Parameter_Metrics:
     def __init__(self,n_clients,clients_params,global_params):
         self.n = n_clients

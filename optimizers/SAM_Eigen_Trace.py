@@ -3,6 +3,11 @@ import torch.nn.functional as F
 from pyhessian import hessian, Trace_Calculator # Trace computation
 
 class SAM_Eigen_Trace(torch.optim.Optimizer):
+    '''
+    Derived from SAM_Trace and SAM_Hessian, this optimizer combines both second order methods to provide a more comprehensive
+    approach to sharpness aware training. It uses both the trace and the maximum eigenvalue of the Hessian as regularization terms,
+    allowing for a more nuanced understanding of the Hessian's structure.
+    '''
     def __init__(self, params, base_optimizer, rho, adaptive=False,maxIter = 5,lambda_t = 0.05, **kwargs):
         assert rho >= 0.0, f"Invalid perturbation rate, should be non-negative: {rho}"
         self.max_norm = 10
