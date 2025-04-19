@@ -10,6 +10,7 @@ import tqdm
 import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+import time
 
 
 class Args:
@@ -307,6 +308,7 @@ class Server:
     
     def train_and_eval(self):
         for r in range(self.tr_rounds):
+            start_time = time.time()
             # Global model communication and local training
             print("Training: Round",r+1,"/",self.tr_rounds)
             self.train()
@@ -328,4 +330,5 @@ class Server:
             
             #Record performance on test data (F1 and Accuracy)
             self.test_metrics(r)
+            self.metrics[r]["Time"] = time.time() - start_time
             print("Training Round Complete!")
