@@ -193,6 +193,9 @@ class Server:
         with open(save_path, "w") as f:
             json.dump(serializable_metrics, f, indent=4)
         
+        save_path = "g_models/"+self.data.name+"_"+self.aggregation+"_"+"_"+self.aggregator+"_"+self.opt_name+"_"+time+".pth"
+        torch.save(self.global_model.state_dict(),save_path)
+        
     def split_data(self):
         self.data = DatasetObject(self.dataset,self.n_clients,self.seed,self.rule,self.ub_sgm,self.alpha)
         path = "Data/"+self.data.name
