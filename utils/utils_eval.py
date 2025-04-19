@@ -17,7 +17,7 @@ class Test:
         self.model = model 
         self.device = device
         self.model = self.model.to(self.device)
-        self.dataloader = data.DataLoader(Dataset(self.test_x,self.test_y,dataset_name=dataset),128,False)
+        self.dataloader = data.DataLoader(Dataset(self.test_x,self.test_y,dataset_name=dataset),512,False)
         self.n_rounds = n_rounds
         self.n_traces = n_traces
 
@@ -38,12 +38,12 @@ class Test:
         # Calculate Accuracy
         accuracy = accuracy_score(all_labels, all_preds)
 
-        # Calculate trace and top eigenvalue of the Hessian over test dataset
+        # Calculate trace and top eigenvalue of the Hessian over test dataset (use only last sample for tractability)
         if r % (self.n_rounds // self.n_traces) == 0 or r == self.n_rounds - 1:
-            hessian_comp = Trace_Calculator(self.model,torch.nn.CrossEntropyLoss(), dataloader=self.dataloader, cuda=True)
-            trace  = hessian_comp.compute_hessian_trace()
-            hessian_comp = hessian(self.model,torch.nn.CrossEntropyLoss(), data=(inputs, labels), cuda=True)
-            top_eigenvalues, _ = hessian_comp.eigenvalues()
+            hessian_comp = hessian(self.model,torch.nn.CrossEntropyLoss(), dataloader=self.dataloader, cuda=True)
+            trace  = np.mean(hessian_comp.trace(1))
+            hessian_comp = hessian(self.model,torch.nn.CrossEntropyLoss(), dataloader=self.dataloader, cuda=True)
+            top_eigenvalues, _ = hessian_comp.eigenvalues(1)
             top_eigenvalue = top_eigenvalues[-1]
         else:
             trace = None

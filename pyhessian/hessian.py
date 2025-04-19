@@ -22,6 +22,7 @@ import torch
 import math
 from torch.autograd import Variable
 import numpy as np
+from tqdm import tqdm
 
 from pyhessian.utils import group_product, group_add, normalization, get_params_grad, hessian_vector_product, orthnormal
 
@@ -70,7 +71,7 @@ class hessian():
 
             # if we only compute the Hessian information for a single batch data, we can re-use the gradients.
             outputs = self.model(self.inputs)
-            loss = self.criterion(outputs, self.targets)
+            loss = self.criterion(outputs, self.targets.reshape(-1).long())
             loss.backward(create_graph=True)
 
         # this step is used to extract the parameters from the model
@@ -89,7 +90,7 @@ class hessian():
             self.model.zero_grad()
             tmp_num_data = inputs.size(0)
             outputs = self.model(inputs.to(device))
-            loss = self.criterion(outputs, targets.to(device))
+            loss = self.criterion(outputs, targets.reshape(-1).long().to(device))
             loss.backward(create_graph=True)
             params, gradsH = get_params_grad(self.model)
             self.model.zero_grad()
@@ -396,7 +397,7 @@ class Trace_Calculator:
 
             # Compute gradients for single-batch case
             outputs = self.model(self.inputs)
-            loss = self.criterion(outputs, self.targets)
+            loss = self.criterion(outputs, self.targets.reshape(-1).long())
             loss.backward(create_graph=True)
         
         else:
@@ -404,8 +405,8 @@ class Trace_Calculator:
             for inputs, targets in self.dataloader:
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets)
-                loss.backward(create_graph=True)
+                loss = self.criterion(outputs, targets.reshape(-1).long())
+                loss.backward(create_graph=False)
                 n_batches += 1
             
             # Normalize gradients by number of batches
@@ -414,7 +415,7 @@ class Trace_Calculator:
                     param.grad /= n_batches
 
         # Extract parameters and gradients
-        self.params, self.gradsH = self.get_params_grad(self.model)
+        self.params, self.gradsH = self.get_params_grad()
 
     def get_params_grad(self):
         """ Get model parameters and their gradients """
@@ -428,7 +429,7 @@ class Trace_Calculator:
         return params, grads
 
     def compute_hessian_trace(self, n_samples = 100, tol = 1e-3):
-        trace = torch.tensor(0.0, device=self.params.device)
+        trace = torch.tensor(0.0, device=self.params[0].device)
         for i in range(n_samples):
             # Generate random Rademacher vectors
             zs = [torch.randint(0, 2, p.size(), device=p.device) * 2.0 - 1.0 for p in self.params]

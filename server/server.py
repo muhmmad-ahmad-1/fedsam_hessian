@@ -148,6 +148,8 @@ class Server:
         
         self.metrics = {}
         self.correlations = {}
+
+        self.global_model.to(self.device)
         
         self.split_data()
         
@@ -164,14 +166,31 @@ class Server:
         print("Model Parameters Initialized")
 
         self.train_and_eval()
+        self.metrics['args'] = self.args
+
+        def make_serializable(obj):
+            if isinstance(obj, dict):
+                return {k: make_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_serializable(v) for v in obj]
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, np.generic):  # np.float32, np.int32, etc.
+                return obj.item()
+            elif isinstance(obj, torch.Tensor):
+                return obj.tolist()
+            elif hasattr(obj, '__dict__'):  # For class instances
+                return make_serializable(vars(obj))
+            else:
+                return obj
+            
+        serializable_metrics = make_serializable(self.metrics)
         
-        self.results = json.dumps(self.metrics)
-        self.results['args'] = self.args
         time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         
         save_path = "Results/"+self.data.name+"_"+self.aggregation+"_"+"_"+self.aggregator+"_"+self.opt_name+"_"+time+".json"
         with open(save_path, "w") as f:
-            f.write(self.results)
+            json.dump(serializable_metrics, f, indent=4)
         
     def split_data(self):
         self.data = DatasetObject(self.dataset,self.n_clients,self.seed,self.rule,self.ub_sgm,self.alpha)
@@ -202,12 +221,13 @@ class Server:
 
         self.global_model = self.global_model.to(self.device)
         
-        aggregated_gradients = {name:torch.zeros_like(grad) for name,grad in self.clients[0].grad.items()}
+        aggregated_gradients = {name:torch.zeros_like(grad).to(self.device) for name,grad in self.clients[0].grad.items()}
         
         for j,client in enumerate(self.clients):
-            for i,(name,grad) in enumerate(client.grad.items()):
-                aggregated_gradients[name] += grad * self.data_ratio[j]
-        
+            if j in self.random_select:
+                for i,(name,grad) in enumerate(client.grad.items()):
+                    aggregated_gradients[name] += grad * self.data_ratio[j]
+            
         with torch.no_grad():
             for param, agg_grad in zip(self.global_model.parameters(), aggregated_gradients.values()):
                 param.grad = agg_grad
@@ -280,7 +300,7 @@ class Server:
             self.metrics[round]["Top Eigenvalue"] = top_eigenvalue
     
     def gradient_eval(self,round):
-        client_grads = [client.grad for client in self.clients if client.id in self.random_select]
+        client_grads = [client.grad for client in self.clients if self.clients.index(client) in self.random_select]
         self.grad_metrics = Gradient_Metrics(self.random_selection,client_grads,self.global_grad)
         
         self.metrics[round] = self.grad_metrics.metrics

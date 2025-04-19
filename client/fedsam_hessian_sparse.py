@@ -4,9 +4,9 @@ from models import *
 from optimizers import *
 from utils import *
 
-class fedsam_hessian(Client):
+class fedsam_hessian_sparse(Client):
     def __init__(self,dataset,trn_x,trn_y,batch_size,loss_func,learning_rate,weight_decay,optimizer,max_norm,grad_aggregator = False,args = {"mu":0.0},epochs=3):
-        super(fedsam_hessian,self).__init__(dataset,trn_x,trn_y,batch_size,loss_func,learning_rate,weight_decay,optimizer,max_norm,grad_aggregator,args,epochs)
+        super(fedsam_hessian_sparse,self).__init__(dataset,trn_x,trn_y,batch_size,loss_func,learning_rate,weight_decay,optimizer,max_norm,grad_aggregator,args,epochs)
         self.sparse_type = args.sparse_type
         self.sparse_k = args.sparse_k
     

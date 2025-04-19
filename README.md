@@ -1,6 +1,6 @@
 # FedSAMHessian: FedSAM with Second-Order Perturbations and Trace Regularization
 
-This repository implements federated learning algorithms that incorporate second-order information and trace regularization to improve model generalization and convergence. The project builds upon existing second-order Sharpness-Aware Minimization (SAM) in literature and extends it to the federated learning setting improving upon the base FedSAM (using first-order perturbation).
+This repository implements federated learning algorithms that incorporate second-order information and trace regularization to improve model generalization and convergence. The project builds upon existing second-order Sharpness-Aware Minimization (SAM) in literature and extends it to the federated learning setting, improving upon the base FedSAM (using first-order perturbation).
 
 ## Table of Contents
 - [Benchmarks](#benchmarks)
@@ -8,7 +8,7 @@ This repository implements federated learning algorithms that incorporate second
 - [Comparison with Existing Methods](#qualitative-comparison-with-existing-sam-methods)
 - [Variants of Second-Order Methods](#variants-of-second-order-methods)
 - [Joint Approaches](#joint-approaches)
-- [Orthogonalality of  Proposed Second-Order Methods](#orthogonalality-of-proposed-second-order-methods)
+- [Orthogonality of  Proposed Second-Order Methods](#orthogonalality-of-proposed-second-order-methods)
 - [Computational Considerations](#computational-considerations)
 - [Current Goals](#current-goals)
 - [Results and Conclusion](#results-and-conclusion)
@@ -32,7 +32,7 @@ We test our approaches with various model architectures:
 
 ### FedSAM_Hessian
 
-The base second-order approach extends FedSAM by incorporating Hessian information to guide parameter updates. Instead of using just the first-order gradients for perturbation, we compute the top eigenvector of the Hessian matrix and incroporate it as well to perturb the model parameters.
+The base second-order approach extends FedSAM by incorporating Hessian information to guide parameter updates. Instead of using just the first-order gradients for perturbation, we compute the top eigenvector of the Hessian matrix and include it to perturb the model parameters.
 
 Key components:
 - Computation of top eigenvector of Hessian using power iteration method
@@ -78,7 +78,7 @@ This joint approach combines both eigenvector-based perturbation and trace regul
 2. Incorporates trace regularization in the loss function
 3. Uses both metrics to achieve locally flatter minima.
 
-### FedSAM_Hessian_Orth (Inhertied from ["Explicit Eigenvalue Regularization Improves Sharpness-Aware Minimization"](https://arxiv.org/abs/2501.12666))
+### FedSAM_Hessian_Orth (Inherited from ["Explicit Eigenvalue Regularization Improves Sharpness-Aware Minimization"](https://arxiv.org/abs/2501.12666))
 
 This approach ensures orthogonality between the perturbation direction and the gradient:
 
@@ -87,7 +87,7 @@ This approach ensures orthogonality between the perturbation direction and the g
 3. Adds this orthogonal component to existing first-order perturbation
 
 ## Latency of Proposed Method and Consequent Optimizations
-The existing iterative methods lead to much longer training times (2x - 4x) than the base methods. We analyze sparser implementations of the our second-order method to achieve superior performances given a compute budget / upper bounds on local training.
+The existing iterative methods lead to much longer training times (2x - 4x) than the base methods. We analyze sparser implementations of our second-order method to achieve superior performances given a compute budget / upper bounds on local training.
 
 ### FedSAMHessian_Interleaved
 
@@ -142,13 +142,13 @@ To address this challenge, we propose:
 
 Further Envisioned (Future Work):
 
-* **Adaptive Switching**: Monitor sharpness and perform switch when gains (sharpness drop) diminishes
+* **Adaptive Switching**: Monitor sharpness and perform a switch when gains (sharpness drop) diminishes
 
 ## Current Goals 
 
-### (Not Yet Implemented - To Be Done by this Week)
+### (Not Yet Implemented - To Be Done by This Week)
 
-### FedSAMHessian_Interleaved
+### FedSAMHessian_Interleaved (Done, Running)
 
 This approach will interleave first-order and second-order updates to balance computational efficiency with the benefits of second-order information. It will:
 
@@ -156,7 +156,7 @@ This approach will interleave first-order and second-order updates to balance co
 2. Periodically compute and apply second-order perturbations
 3. Adapt the frequency of second-order updates based on training progress
 
-### FedSAMHessian_Switch
+### FedSAMHessian_Switch (Done, Running)
 
 This approach will switch from first-order to second-order methods during training to leverage the benefits of both approaches at different stages. It will:
 
@@ -189,7 +189,7 @@ Our experiments demonstrate that incorporating second-order information and trac
 3. Orthogonal methods (SAM_Hessian_Orth) are particularly effective for challenging datasets
 4. Hybrid approaches offer a good balance between computational efficiency and performance
 
-< I will add the detailed experimental setups and results soon>
+< I will add the detailed experimental setups (in another markdown) and results soon>
 
 ## Future Work
 * Adaptive switching between first and second order methods
