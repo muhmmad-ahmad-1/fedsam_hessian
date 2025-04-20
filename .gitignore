@@ -3,3 +3,5 @@
 *.csv
 *.json
 /Data/*
+*.pth
+g_models/*
