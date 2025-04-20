@@ -92,6 +92,7 @@ class DatasetObject:
                 tst_y = tst_y.numpy().reshape(-1, 1)
             
             elif self.dataset == 'PACS':
+                data_path = self.data_path + "/Raw/"+"PACS"
                 # Define domains
                 self.domains = ['art_painting', 'cartoon', 'photo', 'sketch']
                 self.n_cls = 7  # PACS has 7 categories
@@ -108,7 +109,7 @@ class DatasetObject:
                     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
                 ])
 
-                domain_paths = [os.path.join(self.data_path, d) for d in self.domains]
+                domain_paths = [os.path.join(data_path, d) for d in self.domains]
                 trn_x, trn_y = [], []
                 tst_x, tst_y = [], []
 
@@ -133,6 +134,7 @@ class DatasetObject:
                 tst_y = np.concatenate(tst_y, axis=0)
             
             elif self.dataset == 'OfficeHome':
+                data_path = self.data_path +"/Raw/"+self.dataset
                 self.domains = ['Art', 'Clipart', 'Product', 'Real_World']
                 self.n_cls = 65
                 self.channels = 3
@@ -191,18 +193,19 @@ class DatasetObject:
             n_data_per_clnt = int((len(trn_y)) / self.n_client)
             
             # Draw from lognormal distribution to create some imbalance among the clients
-            print("Sampling priors from a lognormal distribution...")
-            clnt_data_list = (np.random.lognormal(mean=np.log(n_data_per_clnt), sigma=self.unbalanced_sgm, size=self.n_client))
-            clnt_data_list = (clnt_data_list/np.sum(clnt_data_list)*len(trn_y)).astype(int)
-            diff = np.sum(clnt_data_list) - len(trn_y)
-            
-            # Adjust the data counts for the clients to ensure that the total number of data points matches exactly.
-            if diff!= 0:
-                for clnt_i in range(self.n_client):
-                    if clnt_data_list[clnt_i] > diff:
-                        clnt_data_list[clnt_i] -= diff
-                        break
-                    
+            # print("Sampling priors from a lognormal distribution...")
+            # clnt_data_list = (np.random.lognormal(mean=np.log(n_data_per_clnt), sigma=self.unbalanced_sgm, size=self.n_client))
+            # clnt_data_list = (clnt_data_list/np.sum(clnt_data_list)*len(trn_y)).astype(int)
+            # diff = np.sum(clnt_data_list) - len(trn_y)
+            # # print(diff)
+            # # Adjust the data counts for the clients to ensure that the total number of data points matches exactly.
+            # if diff!= 0:
+            #     for clnt_i in range(self.n_client):
+            #         if clnt_data_list[clnt_i] > diff:
+            #             clnt_data_list[clnt_i] -= diff
+            #             break
+            clnt_data_list = np.ones(self.n_client,dtype=int) * n_data_per_clnt
+            # print(clnt_data_list)
             # Split the dataset among multiple clients according to drichlet distribution
             print("Splitting according to Drichlet distribution with alpha=",self.rule_arg,"...")
             if self.rule == 'Drichlet' or self.rule=='Pathological':

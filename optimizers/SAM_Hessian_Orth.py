@@ -42,7 +42,7 @@ class SAM_Hessian_Orth(torch.optim.Optimizer):
         # Get top eigenvector
         _, top_eigenvector = hessian_comp.eigenvalues(maxIter=self.maxIter, tol=1e-2)
         v = top_eigenvector[-1]
-        v_vector = torch.cat([x.view(-1) for x in v])
+        v_vector = torch.cat([x.reshape(-1) for x in v])  # Reshape instead of view
         v_unit = v_vector / (v_vector.norm() + 1e-7)
 
         # Compute parallel and perpendicular components
