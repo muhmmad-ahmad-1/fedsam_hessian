@@ -4,4 +4,4 @@
 *.json
 /Data/*
 *.pth
-g_models/*
+/g_models/*
